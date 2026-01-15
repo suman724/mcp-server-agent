@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcp-calculator"
+version = "0.1.0"
+description = "A basic calculator MCP server"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "mcp[cli]",
+    "fastapi",
+    "uvicorn",
+    "pydantic",
+    "structlog",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "httpx",
+]
+
+[project.scripts]
+mcp-calculator = "mcp_calculator:main"
+
+[tool.setuptools]
+packages = ["mcp_calculator"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
