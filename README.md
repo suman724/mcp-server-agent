@@ -15,24 +15,37 @@ an ADK-based agent that uses the MCP tools, and a small Python client.
 ## How it Works
 
 ```mermaid
-graph TB
-    subgraph "CLI Mode"
-        CLI[CLI User] -->|prompt| Agent[Calculator Agent]
+flowchart LR
+    subgraph CLI["CLI Mode"]
+        U1[User]
     end
     
-    subgraph "A2A Mode"
-        Invoker[A2A Invoker] -->|HTTP POST /calculator| AgentServer[Agent Server :8001]
+    subgraph A2A["A2A Mode"]
+        U2[A2A Invoker]
     end
     
-    Agent -->|Streamable HTTP| MCP[MCP Server :8000]
-    AgentServer -->|Streamable HTTP| MCP
+    subgraph Agent["Calculator Agent"]
+        A1[Agent Instance]
+        A2[Agent Server<br/>:8001]
+    end
     
-    MCP -->|Tool: add/subtract/multiply/divide| MCP
-    MCP -->|Results| Agent
-    MCP -->|Results| AgentServer
+    subgraph MCP["MCP Server :8000"]
+        Tools[Calculator Tools<br/>add, subtract,<br/>multiply, divide]
+    end
     
-    Agent -->|Response| CLI
-    AgentServer -->|Response| Invoker
+    U1 -->|prompt| A1
+    U2 -->|POST /calculator| A2
+    
+    A1 & A2 -->|request tools| Tools
+    Tools -->|results| A1 & A2
+    
+    A1 -->|response| U1
+    A2 -->|response| U2
+    
+    style CLI fill:#e1f5ff
+    style A2A fill:#fff4e1
+    style Agent fill:#f0f0f0
+    style MCP fill:#e8f5e9
 ```
 
 1. The MCP server exposes calculator tools over HTTP/SSE.
