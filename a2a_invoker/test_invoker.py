@@ -4,6 +4,20 @@ import httpx
 import sys
 from pathlib import Path
 
+from a2a.types import (
+    AgentCapabilities,
+    AgentCard,
+    AgentSkill,
+    Message,
+    Part,
+    Role,
+    SendMessageSuccessResponse,
+    Task,
+    TaskState,
+    TaskStatus,
+    TextPart,
+)
+
 # Add parent directory to path to import the invoker module
 sys.path.insert(0, str(Path(__file__).parent))
 
@@ -14,12 +28,26 @@ async def test_get_agent_card_success():
     from main import get_agent_card
     
     mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "name": "Calculator Agent",
-        "description": "Test agent",
-        "capabilities": ["math"],
-        "version": "0.1.0"
-    }
+    card = AgentCard(
+        name="Calculator Agent",
+        description="Test agent",
+        url="http://localhost:8001/calculator",
+        version="0.1.0",
+        capabilities=AgentCapabilities(streaming=False),
+        default_input_modes=["text/plain"],
+        default_output_modes=["text/plain"],
+        skills=[
+            AgentSkill(
+                id="calculator",
+                name="Calculator",
+                description="Test skill",
+                tags=["math"],
+            )
+        ],
+    )
+    mock_response.json.return_value = card.model_dump(
+        mode="json", exclude_none=True
+    )
     mock_response.raise_for_status = MagicMock()
     
     with patch("httpx.AsyncClient") as mock_client_class:
@@ -32,8 +60,8 @@ async def test_get_agent_card_success():
         result = await get_agent_card()
         
         assert result is not None
-        assert result["name"] == "Calculator Agent"
-        assert "capabilities" in result
+        assert result.name == "Calculator Agent"
+        assert result.capabilities is not None
         mock_client.get.assert_called_once()
 
 @pytest.mark.asyncio
@@ -57,12 +85,28 @@ async def test_invoke_agent_success():
     """Test invoking agent successfully."""
     from main import invoke_agent
     
+    user_message = Message(
+        message_id="msg-user",
+        role=Role.user,
+        parts=[Part(root=TextPart(text="Calculate 6 * 7"))],
+    )
+    agent_message = Message(
+        message_id="msg-agent",
+        role=Role.agent,
+        parts=[Part(root=TextPart(text="The result is 42"))],
+    )
+    task = Task(
+        id="task-1",
+        context_id="ctx-1",
+        status=TaskStatus(state=TaskState.completed, message=agent_message),
+        history=[user_message, agent_message],
+    )
+    success = SendMessageSuccessResponse(id="req-1", result=task)
+
     mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "messages": [
-            {"role": "assistant", "content": "The result is 42"}
-        ]
-    }
+    mock_response.json.return_value = success.model_dump(
+        mode="json", exclude_none=True
+    )
     mock_response.raise_for_status = MagicMock()
     
     with patch("httpx.AsyncClient") as mock_client_class:
@@ -100,12 +144,23 @@ async def test_invoke_agent_no_assistant_message():
     """Test invoking agent when response has no assistant message."""
     from main import invoke_agent
     
+    user_message = Message(
+        message_id="msg-user",
+        role=Role.user,
+        parts=[Part(root=TextPart(text="Test"))],
+    )
+    task = Task(
+        id="task-1",
+        context_id="ctx-1",
+        status=TaskStatus(state=TaskState.completed),
+        history=[user_message],
+    )
+    success = SendMessageSuccessResponse(id="req-1", result=task)
+
     mock_response = MagicMock()
-    mock_response.json.return_value = {
-        "messages": [
-            {"role": "user", "content": "Test"}
-        ]
-    }
+    mock_response.json.return_value = success.model_dump(
+        mode="json", exclude_none=True
+    )
     mock_response.raise_for_status = MagicMock()
     
     with patch("httpx.AsyncClient") as mock_client_class:

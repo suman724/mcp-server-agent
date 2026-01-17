@@ -1,94 +1,150 @@
-
+import asyncio
 import logging
-import uvicorn
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
 
-from .agent import CalculatorAgent, AgentError
+import uvicorn
+from starlette.applications import Starlette
+from starlette.responses import JSONResponse
+from starlette.routing import Mount, Route
+
+from a2a.types import AgentCard
+from mcp.client.session import ClientSession
+from mcp.client.streamable_http import streamable_http_client
+from google.adk.a2a.utils.agent_card_builder import AgentCardBuilder
+from google.adk.a2a.utils.agent_to_a2a import to_a2a
+
+from .agent import build_adk_agent
+from .config import A2A_BASE_URL, MCP_SERVER_URL
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("calculator_server")
 
-app = FastAPI(title="Calculator Agent A2A", description="Exposes the Calculator Agent via A2A protocol.")
+AGENT_PATH = "/calculator"
+AGENT_NAME = "Calculator Agent"
+AGENT_VERSION = "0.1.0"
+AGENT_DESCRIPTION = (
+    "An intelligent agent that performs mathematical operations "
+    "using an MCP calculator server."
+)
 
-class AgentMessage(BaseModel):
-    role: str
-    content: str
 
-class AgentInput(BaseModel):
-    messages: List[AgentMessage]
-    context: Optional[Dict[str, Any]] = None
+def _agent_base_url(base_url: str) -> str:
+    base = base_url.rstrip("/")
+    return base if base.endswith(AGENT_PATH) else f"{base}{AGENT_PATH}"
 
-class AgentResponse(BaseModel):
-    messages: List[AgentMessage]
 
-# Agent Card Model (can be refined based on A2A specs)
-class AgentCard(BaseModel):
-    name: str
-    description: str
-    capabilities: List[str]
-    input_schema: Dict[str, Any]
-    output_schema: Dict[str, Any]
-    version: str = "0.1.0"
-
-agent_instance = None
-
-@app.on_event("startup")
-async def startup_event():
-    global agent_instance
-    try:
-        agent_instance = CalculatorAgent()
-        logger.info("CalculatorAgent initialized successfully.")
-    except Exception as e:
-        logger.error(f"Failed to initialize CalculatorAgent: {e}")
-        # We might want to let it fail or handle it gracefully? 
-        # For now, we log it. logic will fail if agent is None.
-
-@app.get("/calculator/info", response_model=AgentCard)
-async def get_agent_card():
-    return AgentCard(
-        name="Calculator Agent",
-        description="An intelligent agent that performs mathematical operations using an MCP calculator server.",
-        capabilities=["math_operations", "basic_calculation"],
-        input_schema={"type": "object", "properties": {"messages": {"type": "array"}}},
-        output_schema={"type": "object", "properties": {"messages": {"type": "array"}}}
+async def _build_agent_card(agent, agent_url: str) -> AgentCard:
+    builder = AgentCardBuilder(
+        agent=agent,
+        rpc_url=agent_url,
+        agent_version=AGENT_VERSION,
+    )
+    card = await builder.build()
+    return card.model_copy(
+        update={
+            "name": AGENT_NAME,
+            "description": AGENT_DESCRIPTION,
+            "version": AGENT_VERSION,
+            "url": agent_url,
+        },
     )
 
-@app.post("/calculator", response_model=AgentResponse)
-async def run_agent(input_data: AgentInput):
-    if agent_instance is None:
-        raise HTTPException(status_code=503, detail="Agent not initialized.")
-    
-    # Extract the last user message as the prompt
-    # In a real A2A Scenario, we might process the whole history.
-    # The current CalculatorAgent.run() takes a single string prompt.
-    
-    last_user_msg = next((m for m in reversed(input_data.messages) if m.role == "user"), None)
-    
-    if not last_user_msg:
-        raise HTTPException(status_code=400, detail="No user message found in input.")
 
+class LazyA2AApp:
+    def __init__(self, agent, agent_url: str):
+        self._agent = agent
+        self._agent_url = agent_url
+        self._app = None
+        self._agent_card = None
+        self._lock = asyncio.Lock()
+
+    async def _ensure_app(self):
+        if self._app is not None:
+            return self._app
+        async with self._lock:
+            if self._app is not None:
+                return self._app
+            self._agent_card = await _build_agent_card(
+                self._agent,
+                self._agent_url,
+            )
+            app = to_a2a(self._agent, agent_card=self._agent_card)
+            await app.router.startup()
+            self._app = app
+            return app
+
+    async def get_agent_card(self) -> AgentCard:
+        await self._ensure_app()
+        return self._agent_card
+
+    async def __call__(self, scope, receive, send):
+        try:
+            app = await self._ensure_app()
+        except Exception as exc:
+            logger.exception("Failed to initialize A2A app", exc_info=exc)
+            response = JSONResponse(
+                {"error": "A2A app initialization failed", "detail": str(exc)},
+                status_code=503,
+            )
+            await response(scope, receive, send)
+            return
+        await app(scope, receive, send)
+
+
+def _agent_card_alias(lazy_app: LazyA2AApp):
+    async def handler(_request):
+        card = await lazy_app.get_agent_card()
+        return JSONResponse(card.model_dump(mode="json", exclude_none=True))
+
+    return handler
+
+
+async def _health_check(_request):
+    return JSONResponse({"status": "ok"})
+
+
+async def _mcp_health_check(_request):
     try:
-        response_text = await agent_instance.run(last_user_msg.content)
-        return AgentResponse(
-            messages=[AgentMessage(role="assistant", content=response_text)]
+        async with streamable_http_client(
+            MCP_SERVER_URL, terminate_on_close=False
+        ) as (read, write, _get_session_id):
+            async with ClientSession(read, write) as session:
+                await asyncio.wait_for(session.initialize(), timeout=3.0)
+        return JSONResponse({"status": "ok", "mcp_url": MCP_SERVER_URL})
+    except Exception as exc:
+        logger.exception("MCP health check failed", exc_info=exc)
+        return JSONResponse(
+            {"status": "error", "mcp_url": MCP_SERVER_URL, "detail": str(exc)},
+            status_code=503,
         )
-    except AgentError as e:
-        logger.error(f"Agent execution error: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-    except Exception as e:
-        logger.error(f"Unexpected error: {e}")
-        raise HTTPException(status_code=500, detail="Internal server error")
 
-@app.get("/health")
-async def health_check():
-    return {"status": "ok"}
+
+def create_app() -> Starlette:
+    agent_url = _agent_base_url(A2A_BASE_URL)
+    lazy_app = LazyA2AApp(build_adk_agent(), agent_url)
+    return Starlette(
+        routes=[
+            Mount(AGENT_PATH, app=lazy_app, name="a2a_agent"),
+            Route("/.well-known/agent-card.json", _agent_card_alias(lazy_app)),
+            Route("/calculator/info", _agent_card_alias(lazy_app)),
+            Route("/health", _health_check),
+            Route("/health/mcp", _mcp_health_check),
+        ],
+    )
+
+
+app = create_app()
+
 
 def start():
     """Entry point for running the server programmatically."""
-    uvicorn.run("calculator_agent.server:app", host="0.0.0.0", port=8001, reload=True)
+    uvicorn.run(
+        "calculator_agent.server:app",
+        host="0.0.0.0",
+        port=8001,
+        reload=True,
+    )
+
 
 if __name__ == "__main__":
     start()

@@ -1,4 +1,4 @@
-.PHONY: venv server test install-agent run-agent test-agent
+.PHONY: venv server test install-agent install-invoker run-agent test-agent
 
 
 venv:
@@ -39,4 +39,7 @@ run-agent-server:
 	PYTHONPATH=. .venv/bin/python -m calculator_agent.server
 
 run-invoker:
-	@cd a2a_invoker && ../.venv/bin/python -m pip install -r requirements.txt && ../.venv/bin/python main.py $(ARGS)
+	@cd a2a_invoker && ../.venv/bin/python main.py $(ARGS)
+
+install-invoker:
+	@cd a2a_invoker && ../.venv/bin/python -m pip install -r requirements.txt

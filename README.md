@@ -56,7 +56,7 @@ flowchart LR
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.12+
 - `uv` (used in the Makefile for virtualenv + installs)
 - MCP server running locally for agent/client usage
 
@@ -96,6 +96,7 @@ make run-agent ARGS="Calculate 5 + 3"
 ### Agent Environment Variables
 
 - `MCP_SERVER_URL`: MCP server URL (default: `http://localhost:8000/mcp/`)
+- `A2A_BASE_URL`: Base URL used in the Agent Card (default: `http://localhost:8001`)
 - `API_KEY`: Gemini API key (also used as a fallback for LiteLLM)
 - `LLM_PROVIDER`: `gemini` or `litellm`
 - `LLM_MODEL`: Model name (for LiteLLM, use `provider/model`)
@@ -137,8 +138,32 @@ make run-agent-server
 ```
 
 This starts the agent at `http://localhost:8001` with:
-- **Agent Card**: `GET http://localhost:8001/calculator/info`
-- **Invoke Agent**: `POST http://localhost:8001/calculator`
+- **Agent Card**: `GET http://localhost:8001/calculator/.well-known/agent-card.json`
+- **Invoke Agent**: `POST http://localhost:8001/calculator` (JSON-RPC `message/send`)
+- **Health**: `GET http://localhost:8001/health`
+- **MCP Health**: `GET http://localhost:8001/health/mcp`
+
+Note: The Agent Card and A2A routes are initialized on the first request. If the MCP
+server is unavailable at that time, the request will return `503` with an error
+message. Start the MCP server and retry the request.
+
+Example JSON-RPC request:
+```bash
+curl -s http://localhost:8001/calculator \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "req-1",
+    "method": "message/send",
+    "params": {
+      "message": {
+        "message_id": "msg-1",
+        "role": "user",
+        "parts": [{"kind": "text", "text": "Calculate 10 * 5"}]
+      }
+    }
+  }'
+```
 
 ### Calling the Agent via A2A Invoker
 
@@ -149,7 +174,7 @@ make run-invoker ARGS="Calculate 10 * 5"
 ```
 
 The invoker will:
-1. Fetch the Agent Card from `/calculator/info`
+1. Fetch the Agent Card from `/calculator/.well-known/agent-card.json`
 2. Send the prompt to `/calculator`
 3. Display the result
 

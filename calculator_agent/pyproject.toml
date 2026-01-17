@@ -3,7 +3,7 @@ name = "calculator_agent"
 version = "0.1.0"
 description = "An intelligent agent using Google ADK and MCP"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     # Assuming google-adk is the package name based on search results.
     # If the user meant google-generativeai or something else, we might need to adjust.
@@ -14,9 +14,11 @@ dependencies = [
     "google-adk", 
     "litellm",
     "mcp",
+    "a2a-sdk",
     "httpx",
     "pytest-asyncio",
     "fastapi",
+    "sse-starlette",
     "uvicorn",
     "pytest",
 ]
