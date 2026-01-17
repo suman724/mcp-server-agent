@@ -28,3 +28,15 @@ run-agent:
 
 test-agent:
 	.venv/bin/pytest calculator_agent/tests
+
+run-agent-server:
+	@MCP_SERVER_URL=$${MCP_SERVER_URL:-http://localhost:8000/mcp/} \
+	API_KEY=$${API_KEY:-MISSING} \
+	LLM_PROVIDER=$${LLM_PROVIDER:-litellm} \
+	LLM_MODEL=$${LLM_MODEL:-openai/qwen3-4b-instruct} \
+	LLM_API_BASE=$${LLM_API_BASE:-http://saispark:30090/v1} \
+	LLM_API_KEY=$${LLM_API_KEY:-MISSING} \
+	PYTHONPATH=. .venv/bin/python -m calculator_agent.server
+
+run-invoker:
+	@cd a2a_invoker && ../.venv/bin/python -m pip install -r requirements.txt && ../.venv/bin/python main.py $(ARGS)
