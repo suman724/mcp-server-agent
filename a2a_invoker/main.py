@@ -49,6 +49,7 @@ async def invoke_agent(prompt: str):
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             response = await client.post(url, json=payload)
+            print(f"Response: {response.json()}")
             response.raise_for_status()
             data = response.json()
             
