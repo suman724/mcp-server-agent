@@ -4,6 +4,10 @@ This is an intelligent agent built using Google ADK (Agent Development Kit) conc
 
 It connects to a remote MCP server (in this case, the `mcp-calculator` server) to perform mathematical operations.
 
+The agent can run in two modes:
+1. **CLI Mode**: Run the agent from the command line with a prompt.
+2. **A2A Server Mode**: Expose the agent as an HTTP service for agent-to-agent communication.
+
 ## Setup
 
 1.  **Install Dependencies**:
@@ -51,3 +55,18 @@ For testing connection without an API Key:
 ```bash
 make run-agent ARGS="simple_exec add 10 20"
 ```
+
+## A2A Server Mode
+
+You can expose the agent as an HTTP service:
+
+```bash
+make run-agent-server
+```
+
+This starts a FastAPI server on port 8001 with the following endpoints:
+
+-   **Agent Card**: `GET http://localhost:8001/calculator/info` - Returns metadata about the agent.
+-   **Invoke Agent**: `POST http://localhost:8001/calculator` - Accepts messages and returns agent responses.
+
+See the `a2a_invoker` app for an example client.

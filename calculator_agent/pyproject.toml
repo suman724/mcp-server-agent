@@ -16,6 +16,9 @@ dependencies = [
     "mcp",
     "httpx",
     "pytest-asyncio",
+    "fastapi",
+    "uvicorn",
+    "pytest",
 ]
 
 [build-system]
