@@ -1,0 +1,58 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install server dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e server
+      - name: Run server tests
+        run: python -m pytest server/tests
+
+  test-agent:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install agent dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e calculator_agent
+      - name: Run agent tests
+        run: python -m pytest calculator_agent/tests
+
+  test-invoker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install invoker dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r a2a_invoker/requirements.txt
+          python -m pip install pytest pytest-asyncio
+      - name: Run invoker tests
+        run: python -m pytest a2a_invoker/test_invoker.py
+
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build MCP server image
+        run: docker build -t mcp-calculator -f server/Dockerfile server
+      - name: Build calculator agent image
+        run: docker build -t calculator-agent -f calculator_agent/Dockerfile calculator_agent
