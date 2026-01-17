@@ -1,4 +1,3 @@
-import asyncio
 import pytest
 from starlette.testclient import TestClient
 
@@ -13,9 +12,6 @@ from calculator_agent import server
 
 @pytest.fixture
 def client():
-    if not getattr(server.a2a_app.state, "_routes_initialized", False):
-        asyncio.run(server.a2a_app.router.startup())
-        server.a2a_app.state._routes_initialized = True
     with TestClient(server.app) as client:
         yield client
 

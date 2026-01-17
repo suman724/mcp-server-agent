@@ -140,6 +140,12 @@ make run-agent-server
 This starts the agent at `http://localhost:8001` with:
 - **Agent Card**: `GET http://localhost:8001/calculator/.well-known/agent-card.json`
 - **Invoke Agent**: `POST http://localhost:8001/calculator` (JSON-RPC `message/send`)
+- **Health**: `GET http://localhost:8001/health`
+- **MCP Health**: `GET http://localhost:8001/health/mcp`
+
+Note: The Agent Card and A2A routes are initialized on the first request. If the MCP
+server is unavailable at that time, the request will return `503` with an error
+message. Start the MCP server and retry the request.
 
 Example JSON-RPC request:
 ```bash

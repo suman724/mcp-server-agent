@@ -97,22 +97,6 @@ class CalculatorAgent:
             )
         return Gemini(model=self.model_name)
 
-
-def build_adk_agent() -> Agent:
-    calculator_agent = CalculatorAgent()
-    model = calculator_agent._build_model()
-    connection_params = StreamableHTTPConnectionParams(
-        url=calculator_agent.mcp_url,
-        terminate_on_close=False,
-    )
-    toolset = McpToolset(connection_params=connection_params)
-    return Agent(
-        name="calculator_agent",
-        description="Calculator agent backed by MCP tools.",
-        model=model,
-        tools=[toolset],
-    )
-        
     async def run(self, user_prompt: str):
         logger.info(f"Agent received task: {user_prompt}")
         
@@ -210,18 +194,36 @@ def build_adk_agent() -> Agent:
         """
         try:
             async with streamable_http_client(self.mcp_url) as streams:
-                 async with ClientSession(streams[0], streams[1]) as session:
+                async with ClientSession(streams[0], streams[1]) as session:
                     await session.initialize()
                     parts = expression.split()
                     if len(parts) >= 3:
-                         tool_name = parts[0]
-                         try:
-                             a = float(parts[1])
-                             b = float(parts[2])
-                             result = await session.call_tool(tool_name, arguments={"a": a, "b": b})
-                             return result
-                         except Exception as e:
-                             return f"Error executing tool: {e}"
+                        tool_name = parts[0]
+                        try:
+                            a = float(parts[1])
+                            b = float(parts[2])
+                            result = await session.call_tool(
+                                tool_name, arguments={"a": a, "b": b}
+                            )
+                            return result
+                        except Exception as e:
+                            return f"Error executing tool: {e}"
                     return "Could not parse simple command."
         except Exception as e:
-             return f"Error: {e}"
+            return f"Error: {e}"
+
+
+def build_adk_agent() -> Agent:
+    calculator_agent = CalculatorAgent()
+    model = calculator_agent._build_model()
+    connection_params = StreamableHTTPConnectionParams(
+        url=calculator_agent.mcp_url,
+        terminate_on_close=False,
+    )
+    toolset = McpToolset(connection_params=connection_params)
+    return Agent(
+        name="calculator_agent",
+        description="Calculator agent backed by MCP tools.",
+        model=model,
+        tools=[toolset],
+    )
