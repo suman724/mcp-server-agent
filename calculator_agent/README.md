@@ -65,9 +65,9 @@ You can expose the agent as an HTTP service:
 make run-agent-server
 ```
 
-This starts a FastAPI server on port 8001 with the following endpoints:
+This starts a Starlette ASGI server on port 8001 with the following endpoints:
 
--   **Agent Card**: `GET http://localhost:8001/.well-known/agent-card.json` - Returns the A2A Agent Card.
+-   **Agent Card**: `GET http://localhost:8001/calculator/.well-known/agent-card.json` - Returns the A2A Agent Card.
 -   **Invoke Agent**: `POST http://localhost:8001/calculator` - JSON-RPC `message/send` endpoint.
 
 Example JSON-RPC request:

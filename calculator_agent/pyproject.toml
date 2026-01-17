@@ -18,6 +18,7 @@ dependencies = [
     "httpx",
     "pytest-asyncio",
     "fastapi",
+    "sse-starlette",
     "uvicorn",
     "pytest",
 ]

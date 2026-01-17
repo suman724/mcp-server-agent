@@ -25,7 +25,7 @@ The invoker uses a hybrid approach:
 3. **A2A Protocol**: Follows the standard A2A message format for requests and responses
 
 Workflow:
-1. Fetches the Agent Card from `/.well-known/agent-card.json` to discover agent capabilities
+1. Fetches the Agent Card from `/calculator/.well-known/agent-card.json` to discover agent capabilities
 2. Sends a JSON-RPC `message/send` request to `/calculator`
 3. Receives and displays the agent's response
 

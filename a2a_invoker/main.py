@@ -22,8 +22,15 @@ from a2a.utils import get_message_text
 # Configuration
 AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:8001").rstrip("/")
 AGENT_PATH = os.getenv("AGENT_PATH", "/calculator")
+
+def _agent_base_url() -> str:
+    if AGENT_BASE_URL.endswith(AGENT_PATH):
+        return AGENT_BASE_URL
+    return f"{AGENT_BASE_URL}{AGENT_PATH}"
+
+AGENT_RPC_URL = os.getenv("AGENT_RPC_URL", _agent_base_url())
 AGENT_CARD_URL = os.getenv(
-    "AGENT_CARD_URL", f"{AGENT_BASE_URL}/.well-known/agent-card.json"
+    "AGENT_CARD_URL", f"{AGENT_RPC_URL}/.well-known/agent-card.json"
 )
 
 async def get_agent_card() -> AgentCard | None:
@@ -52,7 +59,7 @@ async def get_agent_card() -> AgentCard | None:
 
 async def invoke_agent(prompt: str):
     """Invoke the agent via A2A protocol."""
-    url = f"{AGENT_BASE_URL}{AGENT_PATH}"
+    url = AGENT_RPC_URL
     print(f"Invoking Agent at {url} with prompt: '{prompt}'")
     
     message = Message(

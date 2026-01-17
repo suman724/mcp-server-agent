@@ -138,7 +138,7 @@ make run-agent-server
 ```
 
 This starts the agent at `http://localhost:8001` with:
-- **Agent Card**: `GET http://localhost:8001/.well-known/agent-card.json`
+- **Agent Card**: `GET http://localhost:8001/calculator/.well-known/agent-card.json`
 - **Invoke Agent**: `POST http://localhost:8001/calculator` (JSON-RPC `message/send`)
 
 Example JSON-RPC request:
@@ -168,7 +168,7 @@ make run-invoker ARGS="Calculate 10 * 5"
 ```
 
 The invoker will:
-1. Fetch the Agent Card from `/.well-known/agent-card.json`
+1. Fetch the Agent Card from `/calculator/.well-known/agent-card.json`
 2. Send the prompt to `/calculator`
 3. Display the result
 

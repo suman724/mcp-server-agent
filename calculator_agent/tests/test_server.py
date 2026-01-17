@@ -1,26 +1,27 @@
+import asyncio
 import pytest
-from fastapi.testclient import TestClient
+from starlette.testclient import TestClient
 
 from a2a.types import (
     AgentCapabilities,
     AgentCard,
     AgentSkill,
-    Message,
-    MessageSendParams,
-    Role,
-    SendMessageRequest,
 )
 from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
 
-from calculator_agent.server import app
+from calculator_agent import server
 
 @pytest.fixture
 def client():
-    return TestClient(app)
+    if not getattr(server.a2a_app.state, "_routes_initialized", False):
+        asyncio.run(server.a2a_app.router.startup())
+        server.a2a_app.state._routes_initialized = True
+    with TestClient(server.app) as client:
+        yield client
 
 def test_get_agent_card(client):
     """Test the agent card endpoint."""
-    response = client.get(AGENT_CARD_WELL_KNOWN_PATH)
+    response = client.get(f"/calculator{AGENT_CARD_WELL_KNOWN_PATH}")
     assert response.status_code == 200
     
     card = AgentCard.model_validate(response.json())
@@ -47,16 +48,17 @@ def test_run_agent_invalid_payload(client):
     data = response.json()
     assert data["error"]["code"] == -32600  # InvalidRequestError
 
-def test_run_agent_empty_messages(client):
-    """Test agent invocation with empty message parts."""
-    message = Message(message_id="msg-1", role=Role.user, parts=[])
-    request = SendMessageRequest(
-        id="req-1",
-        params=MessageSendParams(message=message),
-    )
+def test_run_agent_invalid_params(client):
+    """Test agent invocation with invalid params."""
+    request = {
+        "jsonrpc": "2.0",
+        "id": "req-1",
+        "method": "message/send",
+        "params": {},
+    }
     response = client.post(
         "/calculator",
-        json=request.model_dump(mode="json", exclude_none=True),
+        json=request,
     )
     
     assert response.status_code == 200

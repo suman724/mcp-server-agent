@@ -7,6 +7,10 @@ from google.adk.apps.app import App
 from google.adk.models import Gemini
 from google.adk.runners import InMemoryRunner
 from google.adk.utils.context_utils import Aclosing
+from google.adk.tools.mcp_tool.mcp_session_manager import (
+    StreamableHTTPConnectionParams,
+)
+from google.adk.tools.mcp_tool.mcp_toolset import McpToolset
 from google.genai import types
 
 from . import config
@@ -92,6 +96,22 @@ class CalculatorAgent:
                 "to use Gemini."
             )
         return Gemini(model=self.model_name)
+
+
+def build_adk_agent() -> Agent:
+    calculator_agent = CalculatorAgent()
+    model = calculator_agent._build_model()
+    connection_params = StreamableHTTPConnectionParams(
+        url=calculator_agent.mcp_url,
+        terminate_on_close=False,
+    )
+    toolset = McpToolset(connection_params=connection_params)
+    return Agent(
+        name="calculator_agent",
+        description="Calculator agent backed by MCP tools.",
+        model=model,
+        tools=[toolset],
+    )
         
     async def run(self, user_prompt: str):
         logger.info(f"Agent received task: {user_prompt}")
