@@ -178,6 +178,12 @@ The invoker will:
 2. Send the prompt to `/calculator`
 3. Display the result
 
+LangGraph-based invoker:
+
+```bash
+python a2a_invoker/langgraph_invoker.py "Calculate 10 * 5"
+```
+
 ## Client
 
 ```bash
