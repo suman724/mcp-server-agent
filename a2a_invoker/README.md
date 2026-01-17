@@ -17,6 +17,15 @@ This client application demonstrates how to invoke the Calculator Agent using th
     python main.py "Calculate 5 * 5"
     ```
 
+## LangGraph Invoker
+
+This variant uses LangGraph and LangChain primitives to discover the Agent Card
+and invoke the A2A endpoint.
+
+```bash
+python langgraph_invoker.py "Calculate 5 * 5"
+```
+
 ## How It Works
 
 The invoker uses a hybrid approach:
