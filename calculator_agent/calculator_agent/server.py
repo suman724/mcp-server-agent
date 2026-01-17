@@ -20,6 +20,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("calculator_server")
 
 AGENT_PATH = "/calculator"
+AGENT_NAME = "Calculator Agent"
+AGENT_VERSION = "0.1.0"
+AGENT_DESCRIPTION = (
+    "An intelligent agent that performs mathematical operations "
+    "using an MCP calculator server."
+)
 
 
 def _agent_base_url(base_url: str) -> str:
@@ -27,30 +33,27 @@ def _agent_base_url(base_url: str) -> str:
     return base if base.endswith(AGENT_PATH) else f"{base}{AGENT_PATH}"
 
 
-async def _build_agent_card(agent) -> AgentCard:
-    agent_url = _agent_base_url(A2A_BASE_URL)
+async def _build_agent_card(agent, agent_url: str) -> AgentCard:
     builder = AgentCardBuilder(
         agent=agent,
         rpc_url=agent_url,
-        agent_version="0.1.0",
+        agent_version=AGENT_VERSION,
     )
     card = await builder.build()
     return card.model_copy(
         update={
-            "name": "Calculator Agent",
-            "description": (
-                "An intelligent agent that performs mathematical operations "
-                "using an MCP calculator server."
-            ),
-            "version": "0.1.0",
+            "name": AGENT_NAME,
+            "description": AGENT_DESCRIPTION,
+            "version": AGENT_VERSION,
             "url": agent_url,
         },
     )
 
 
 class LazyA2AApp:
-    def __init__(self, agent):
+    def __init__(self, agent, agent_url: str):
         self._agent = agent
+        self._agent_url = agent_url
         self._app = None
         self._agent_card = None
         self._lock = asyncio.Lock()
@@ -61,7 +64,10 @@ class LazyA2AApp:
         async with self._lock:
             if self._app is not None:
                 return self._app
-            self._agent_card = await _build_agent_card(self._agent)
+            self._agent_card = await _build_agent_card(
+                self._agent,
+                self._agent_url,
+            )
             app = to_a2a(self._agent, agent_card=self._agent_card)
             await app.router.startup()
             self._app = app
@@ -85,17 +91,17 @@ class LazyA2AApp:
         await app(scope, receive, send)
 
 
-root_agent = build_adk_agent()
-lazy_a2a_app = LazyA2AApp(root_agent)
+def _agent_card_alias(lazy_app: LazyA2AApp):
+    async def handler(_request):
+        card = await lazy_app.get_agent_card()
+        return JSONResponse(card.model_dump(mode="json", exclude_none=True))
 
-
-async def _agent_card_alias(_request):
-    card = await lazy_a2a_app.get_agent_card()
-    return JSONResponse(card.model_dump(mode="json", exclude_none=True))
+    return handler
 
 
 async def _health_check(_request):
     return JSONResponse({"status": "ok"})
+
 
 async def _mcp_health_check(_request):
     try:
@@ -112,15 +118,22 @@ async def _mcp_health_check(_request):
             status_code=503,
         )
 
-app = Starlette(
-    routes=[
-        Mount(AGENT_PATH, app=lazy_a2a_app, name="a2a_agent"),
-        Route("/.well-known/agent-card.json", _agent_card_alias),
-        Route("/calculator/info", _agent_card_alias),
-        Route("/health", _health_check),
-        Route("/health/mcp", _mcp_health_check),
-    ],
-)
+
+def create_app() -> Starlette:
+    agent_url = _agent_base_url(A2A_BASE_URL)
+    lazy_app = LazyA2AApp(build_adk_agent(), agent_url)
+    return Starlette(
+        routes=[
+            Mount(AGENT_PATH, app=lazy_app, name="a2a_agent"),
+            Route("/.well-known/agent-card.json", _agent_card_alias(lazy_app)),
+            Route("/calculator/info", _agent_card_alias(lazy_app)),
+            Route("/health", _health_check),
+            Route("/health/mcp", _mcp_health_check),
+        ],
+    )
+
+
+app = create_app()
 
 
 def start():

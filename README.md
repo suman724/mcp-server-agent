@@ -56,7 +56,7 @@ flowchart LR
 
 ## Prerequisites
 
-- Python 3.10+
+- Python 3.12+
 - `uv` (used in the Makefile for virtualenv + installs)
 - MCP server running locally for agent/client usage
 

@@ -17,6 +17,7 @@ from . import config
 
 logger = logging.getLogger(__name__)
 
+
 class AgentError(Exception):
     """Base exception for agent errors."""
     pass

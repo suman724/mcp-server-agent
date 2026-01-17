@@ -7,7 +7,7 @@ name = "mcp-calculator"
 version = "0.1.0"
 description = "A basic calculator MCP server"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 dependencies = [
     "mcp[cli]",
     "fastapi",

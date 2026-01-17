@@ -8,6 +8,8 @@ The agent can run in two modes:
 1. **CLI Mode**: Run the agent from the command line with a prompt.
 2. **A2A Server Mode**: Expose the agent as an HTTP service for agent-to-agent communication.
 
+Python 3.12+ is required.
+
 ## Setup
 
 1.  **Install Dependencies**:
