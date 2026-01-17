@@ -14,6 +14,7 @@ dependencies = [
     "google-adk", 
     "litellm",
     "mcp",
+    "a2a-sdk",
     "httpx",
     "pytest-asyncio",
     "fastapi",

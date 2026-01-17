@@ -3,6 +3,9 @@ import os
 # MCP Server Configuration
 MCP_SERVER_URL = os.environ.get("MCP_SERVER_URL", "http://localhost:8000/mcp/")
 
+# A2A Server Configuration
+A2A_BASE_URL = os.environ.get("A2A_BASE_URL", "http://localhost:8001")
+
 # LLM Configuration
 API_KEY = os.environ.get("API_KEY")
 LLM_MODEL = os.environ.get("LLM_MODEL", "gemini-pro")

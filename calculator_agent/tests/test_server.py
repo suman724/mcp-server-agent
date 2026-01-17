@@ -1,6 +1,17 @@
 import pytest
 from fastapi.testclient import TestClient
-from unittest.mock import AsyncMock, patch
+
+from a2a.types import (
+    AgentCapabilities,
+    AgentCard,
+    AgentSkill,
+    Message,
+    MessageSendParams,
+    Role,
+    SendMessageRequest,
+)
+from a2a.utils.constants import AGENT_CARD_WELL_KNOWN_PATH
+
 from calculator_agent.server import app
 
 @pytest.fixture
@@ -9,16 +20,15 @@ def client():
 
 def test_get_agent_card(client):
     """Test the agent card endpoint."""
-    response = client.get("/calculator/info")
+    response = client.get(AGENT_CARD_WELL_KNOWN_PATH)
     assert response.status_code == 200
     
-    data = response.json()
-    assert data["name"] == "Calculator Agent"
-    assert data["version"] == "0.1.0"
-    assert "capabilities" in data
-    assert "math_operations" in data["capabilities"]
-    assert "input_schema" in data
-    assert "output_schema" in data
+    card = AgentCard.model_validate(response.json())
+    assert card.name == "Calculator Agent"
+    assert card.version == "0.1.0"
+    assert card.url.endswith("/calculator")
+    assert card.preferred_transport == "JSONRPC"
+    assert card.capabilities is not None
 
 def test_health_check(client):
     """Test the health check endpoint."""
@@ -33,30 +43,46 @@ def test_run_agent_invalid_payload(client):
         json={"invalid": "payload"}
     )
     
-    assert response.status_code == 422  # Validation error
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"]["code"] == -32600  # InvalidRequestError
 
 def test_run_agent_empty_messages(client):
-    """Test agent invocation with empty messages list."""
+    """Test agent invocation with empty message parts."""
+    message = Message(message_id="msg-1", role=Role.user, parts=[])
+    request = SendMessageRequest(
+        id="req-1",
+        params=MessageSendParams(message=message),
+    )
     response = client.post(
         "/calculator",
-        json={"messages": []}
+        json=request.model_dump(mode="json", exclude_none=True),
     )
     
-    # Should either be 400 or 503 depending on agent_instance state
-    assert response.status_code in [400, 503]
+    assert response.status_code == 200
+    data = response.json()
+    assert data["error"]["code"] == -32602  # InvalidParamsError
 
 def test_agent_card_structure():
     """Test the agent card has the expected structure."""
-    from calculator_agent.server import AgentCard
-    
     card = AgentCard(
         name="Test Agent",
         description="Test description",
-        capabilities=["test"],
-        input_schema={"type": "object"},
-        output_schema={"type": "object"}
+        url="http://localhost:8001/calculator",
+        version="0.1.0",
+        capabilities=AgentCapabilities(streaming=False),
+        default_input_modes=["text/plain"],
+        default_output_modes=["text/plain"],
+        skills=[
+            AgentSkill(
+                id="test",
+                name="Test",
+                description="Test skill",
+                tags=["test"],
+            )
+        ],
     )
     
     assert card.name == "Test Agent"
     assert card.version == "0.1.0"
-    assert len(card.capabilities) == 1
+    assert card.skills[0].id == "test"

@@ -2,17 +2,33 @@
 import asyncio
 import httpx
 import sys
-import json
 import os
-from a2a.types import AgentCard
+import uuid
+
+from a2a.types import (
+    AgentCard,
+    JSONRPCErrorResponse,
+    Message,
+    MessageSendParams,
+    Part,
+    Role,
+    SendMessageRequest,
+    SendMessageResponse,
+    Task,
+    TextPart,
+)
+from a2a.utils import get_message_text
 
 # Configuration
-AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:8001")
+AGENT_BASE_URL = os.getenv("AGENT_BASE_URL", "http://localhost:8001").rstrip("/")
 AGENT_PATH = os.getenv("AGENT_PATH", "/calculator")
+AGENT_CARD_URL = os.getenv(
+    "AGENT_CARD_URL", f"{AGENT_BASE_URL}/.well-known/agent-card.json"
+)
 
-async def get_agent_card() -> AgentCard:
+async def get_agent_card() -> AgentCard | None:
     """Fetch and parse the Agent Card using A2A types."""
-    url = f"{AGENT_BASE_URL}{AGENT_PATH}/info"
+    url = AGENT_CARD_URL
     print(f"Fetching Agent Card from {url}...")
     
     async with httpx.AsyncClient() as client:
@@ -29,7 +45,7 @@ async def get_agent_card() -> AgentCard:
             print(f"Capabilities: {card_data.get('capabilities')}")
             print("------------------\n")
             
-            return card_data
+            return AgentCard.model_validate(card_data)
         except httpx.HTTPError as e:
             print(f"Error fetching agent card: {e}")
             return None
@@ -39,25 +55,44 @@ async def invoke_agent(prompt: str):
     url = f"{AGENT_BASE_URL}{AGENT_PATH}"
     print(f"Invoking Agent at {url} with prompt: '{prompt}'")
     
-    # A2A standard message format
-    payload = {
-        "messages": [
-            {"role": "user", "content": prompt}
-        ]
-    }
+    message = Message(
+        message_id=str(uuid.uuid4()),
+        role=Role.user,
+        parts=[Part(root=TextPart(text=prompt))],
+    )
+    request = SendMessageRequest(
+        id=str(uuid.uuid4()),
+        params=MessageSendParams(message=message),
+    )
+    payload = request.model_dump(mode="json", exclude_none=True)
     
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
             response = await client.post(url, json=payload)
-            print(f"Response: {response.json()}")
             response.raise_for_status()
             data = response.json()
+            print(f"Response: {data}")
             
-            # Extract assistant response from A2A format
-            messages = data.get("messages", [])
-            for msg in messages:
-                if msg.get("role") == "assistant":
-                    return msg.get("content")
+            parsed = SendMessageResponse.model_validate(data).root
+            if isinstance(parsed, JSONRPCErrorResponse):
+                return f"Error invoking agent: {parsed.error.message}"
+
+            result = parsed.result
+            if isinstance(result, Message):
+                text = get_message_text(result).strip()
+                return text or "No response content found."
+
+            if isinstance(result, Task):
+                if result.status and result.status.message:
+                    text = get_message_text(result.status.message).strip()
+                    if text:
+                        return text
+                if result.history:
+                    for msg in reversed(result.history):
+                        if msg.role == Role.agent:
+                            text = get_message_text(msg).strip()
+                            if text:
+                                return text
             
             return "No response content found."
             

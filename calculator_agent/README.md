@@ -41,6 +41,7 @@ make run-agent ARGS="Calculate 5 + 3" \
 ### Environment Variables
 
 -   `MCP_SERVER_URL`: URL of the MCP server (default: `http://0.0.0.0:8000/mcp/`)
+-   `A2A_BASE_URL`: Base URL used in the Agent Card (default: `http://localhost:8001`).
 -   `API_KEY`: Google API Key for Gemini (or set `GEMINI_API_KEY`/`GOOGLE_API_KEY`).
 -   `LLM_PROVIDER`: `gemini` (default) or `litellm` for local/third-party models.
 -   `LLM_MODEL`: Model name to use. For LiteLLM, use `provider/model` (example: `ollama/llama3`).
@@ -66,7 +67,25 @@ make run-agent-server
 
 This starts a FastAPI server on port 8001 with the following endpoints:
 
--   **Agent Card**: `GET http://localhost:8001/calculator/info` - Returns metadata about the agent.
--   **Invoke Agent**: `POST http://localhost:8001/calculator` - Accepts messages and returns agent responses.
+-   **Agent Card**: `GET http://localhost:8001/.well-known/agent-card.json` - Returns the A2A Agent Card.
+-   **Invoke Agent**: `POST http://localhost:8001/calculator` - JSON-RPC `message/send` endpoint.
+
+Example JSON-RPC request:
+```bash
+curl -s http://localhost:8001/calculator \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": "req-1",
+    "method": "message/send",
+    "params": {
+      "message": {
+        "message_id": "msg-1",
+        "role": "user",
+        "parts": [{"kind": "text", "text": "Calculate 5 + 3"}]
+      }
+    }
+  }'
+```
 
 See the `a2a_invoker` app for an example client.
