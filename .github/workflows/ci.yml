@@ -29,7 +29,7 @@ jobs:
       - name: Install agent dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install -e calculator_agent
+          python -m pip install -e "calculator_agent[dev]"
       - name: Run agent tests
         run: python -m pytest calculator_agent/tests
 

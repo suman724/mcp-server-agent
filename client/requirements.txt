@@ -1,4 +1,1 @@
 httpx
-python-dotenv
-mcp
-anyio

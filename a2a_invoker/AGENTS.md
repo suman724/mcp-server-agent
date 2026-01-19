@@ -9,6 +9,10 @@ From this directory:
 ```bash
 pip install -r requirements.txt
 ```
+For the LangGraph variant:
+```bash
+pip install -r requirements-langgraph.txt
+```
 
 ## Run
 
@@ -19,6 +23,7 @@ python main.py "Calculate 5 * 5"
 
 LangGraph variant:
 ```bash
+pip install -r requirements-langgraph.txt
 python langgraph_invoker.py "Calculate 5 * 5"
 ```
 

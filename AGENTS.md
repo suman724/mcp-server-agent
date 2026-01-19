@@ -47,6 +47,10 @@ make run-invoker ARGS="Calculate 10 * 5"
 # or
 .venv/bin/python a2a_invoker/langgraph_invoker.py "Calculate 10 * 5"
 ```
+For the LangGraph variant, install extra requirements:
+```bash
+make install-invoker-langgraph
+```
 
 Client (requires MCP server running):
 ```bash
