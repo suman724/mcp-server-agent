@@ -13,8 +13,7 @@ A simple Python client to interact with the Calculator MCP Server.
    ```bash
    pip install -r requirements.txt
    ```
-   *Note: Ensure you have `mcp[cli]` or `mcp` installed if using the SDK helper.* 
-   Actually, `requirements.txt` should include `mcp`.
+   *Note: This client uses direct HTTP via `httpx`, so no MCP SDK dependency is required.*
 
 ## Usage
 

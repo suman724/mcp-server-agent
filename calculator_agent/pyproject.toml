@@ -5,27 +5,23 @@ description = "An intelligent agent using Google ADK and MCP"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    # Assuming google-adk is the package name based on search results.
-    # If the user meant google-generativeai or something else, we might need to adjust.
-    # For now, we'll try to use standard google-generativeai as ADK might not be on PyPI directly as 'google-adk' 
-    # or it might be 'google-cloud-aiplatform'. 
-    # Let's double check the search results from earlier. 
-    # Ah, result [1] said "google-adk". Let's stick to that but also add mcp.
-    "google-adk", 
+    "google-adk",
     "litellm",
     "mcp",
     "a2a-sdk",
-    "httpx",
-    "pytest-asyncio",
-    "fastapi",
-    "sse-starlette",
     "uvicorn",
-    "pytest",
+    "starlette",
 ]
 
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "pytest-asyncio",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

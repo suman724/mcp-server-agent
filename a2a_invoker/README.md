@@ -8,6 +8,10 @@ This client application demonstrates how to invoke the Calculator Agent using th
     ```bash
     pip install -r requirements.txt
     ```
+    For the LangGraph variant:
+    ```bash
+    pip install -r requirements-langgraph.txt
+    ```
 
 ## Usage
 
@@ -23,6 +27,7 @@ This variant uses LangGraph and LangChain primitives to discover the Agent Card
 and invoke the A2A endpoint.
 
 ```bash
+pip install -r requirements-langgraph.txt
 python langgraph_invoker.py "Calculate 5 * 5"
 ```
 

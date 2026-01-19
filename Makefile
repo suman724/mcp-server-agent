@@ -12,7 +12,7 @@ test:
 	.venv/bin/pytest server/tests
 
 install-agent:
-	uv pip install -e calculator_agent
+	uv pip install -e "calculator_agent[dev]"
 
 
 #make run-agent ARGS="what is the sum of 5 and 10"
@@ -43,3 +43,6 @@ run-invoker:
 
 install-invoker:
 	@cd a2a_invoker && ../.venv/bin/python -m pip install -r requirements.txt
+
+install-invoker-langgraph:
+	@cd a2a_invoker && ../.venv/bin/python -m pip install -r requirements-langgraph.txt

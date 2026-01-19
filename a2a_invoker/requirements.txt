@@ -1,4 +1,2 @@
 httpx
 a2a-sdk
-langchain-core
-langgraph
