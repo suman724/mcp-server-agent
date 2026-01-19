@@ -1,6 +1,10 @@
 {
-  "release-type": "simple",
-  "package-name": "mcp-server-agent",
-  "changelog-path": "CHANGELOG.md",
-  "version-file": "VERSION"
+  "packages": {
+    ".": {
+      "release-type": "simple",
+      "package-name": "mcp-server-agent",
+      "changelog-path": "CHANGELOG.md",
+      "version-file": "VERSION"
+    }
+  }
 }
