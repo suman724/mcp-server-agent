@@ -10,7 +10,7 @@ from a2a.types import (
 )
 from google.adk.a2a.utils.agent_card_builder import AgentCardBuilder
 
-async def _stub_agent_card_build(self):  # noqa: D401
+async def _stub_agent_card_build(*args, **kwargs):  # noqa: D401
     return AgentCard(
         name="Calculator Agent",
         description="Stub agent card for tests.",
