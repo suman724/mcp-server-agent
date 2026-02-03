@@ -6,6 +6,9 @@ venv:
 	uv pip install -e "server/[dev]"
 
 server:
+	OIDC_ISSUER=$${OIDC_ISSUER:-https://dev-d2i2ktw25ycepyad.us.auth0.com/} \
+	OIDC_AUDIENCE=$${OIDC_AUDIENCE:-https://mcp.msgraph.com} \
+	OIDC_JWKS_URL=$${OIDC_JWKS_URL:-https://dev-d2i2ktw25ycepyad.us.auth0.com/.well-known/jwks.json} \
 	.venv/bin/python -m mcp_calculator
 
 test:
