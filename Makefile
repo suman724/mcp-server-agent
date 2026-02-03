@@ -15,7 +15,7 @@ test:
 	.venv/bin/pytest server/tests
 
 install-agent:
-	uv pip install -e "calculator_agent[dev]"
+	.venv/bin/python -m pip install -e "calculator_agent[dev]"
 
 
 #make run-agent ARGS="what is the sum of 5 and 10"
@@ -39,6 +39,9 @@ run-agent-server:
 	LLM_MODEL=$${LLM_MODEL:-openai/qwen3-4b-instruct} \
 	LLM_API_BASE=$${LLM_API_BASE:-http://saispark:30090/v1} \
 	LLM_API_KEY=$${LLM_API_KEY:-MISSING} \
+	OIDC_ISSUER=$${OIDC_ISSUER:-https://dev-d2i2ktw25ycepyad.us.auth0.com/} \
+	OIDC_AUDIENCE=$${OIDC_AUDIENCE:-https://mcp.msgraph.com} \
+	OIDC_JWKS_URL=$${OIDC_JWKS_URL:-https://dev-d2i2ktw25ycepyad.us.auth0.com/.well-known/jwks.json} \
 	PYTHONPATH=. .venv/bin/python -m calculator_agent.server
 
 run-invoker:

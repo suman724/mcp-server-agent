@@ -214,6 +214,12 @@ class CalculatorAgent:
             return f"Error: {e}"
 
 
+from .patches import apply_patches
+from .context import token_context
+
+# Apply monkey patches at import time
+apply_patches()
+
 def build_adk_agent() -> Agent:
     calculator_agent = CalculatorAgent()
     model = calculator_agent._build_model()
@@ -221,10 +227,19 @@ def build_adk_agent() -> Agent:
         url=calculator_agent.mcp_url,
         terminate_on_close=False,
     )
-    toolset = McpToolset(connection_params=connection_params)
+    toolset = McpToolset(
+        connection_params=connection_params,
+        header_provider=lambda _: _get_auth_headers(),
+    )
     return Agent(
         name="calculator_agent",
         description="Calculator agent backed by MCP tools.",
         model=model,
         tools=[toolset],
     )
+
+def _get_auth_headers():
+    token = token_context.get()
+    if token:
+        return {"Authorization": f"Bearer {token}"}
+    return {}

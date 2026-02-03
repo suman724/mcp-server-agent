@@ -83,11 +83,15 @@ async def get_agent_card() -> AgentCard | None:
     """Fetch and parse the Agent Card using A2A types."""
     _base, _path, _rpc_url, card_url = _resolve_agent_urls()
     url = card_url
-    print(f"Fetching Agent Card from {url}...")
-    
-    async with httpx.AsyncClient() as client:
+    print(f"Fetching Agent Card from {card_url}...")
+    headers = {}
+    token = os.getenv("MCP_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+        
+    async with httpx.AsyncClient(timeout=10.0) as client:
         try:
-            response = await client.get(url)
+            response = await client.get(card_url, headers=headers)
             response.raise_for_status()
             card_data = response.json()
             
@@ -121,9 +125,16 @@ async def invoke_agent(prompt: str, rpc_url: str | None = None):
     )
     payload = request.model_dump(mode="json", exclude_none=True)
     
+    headers = {}
+    token = os.getenv("MCP_TOKEN")
+    if token:
+        headers["Authorization"] = f"Bearer {token}"
+    else:
+        print("Warning: MCP_TOKEN not set. Invocation may fail.")
+
     async with httpx.AsyncClient(timeout=60.0) as client:
         try:
-            response = await client.post(url, json=payload)
+            response = await client.post(url, json=payload, headers=headers)
             response.raise_for_status()
             data = response.json()
             print(f"Response: {data}")

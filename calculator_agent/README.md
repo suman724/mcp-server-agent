@@ -7,8 +7,46 @@ It connects to a remote MCP server (in this case, the `mcp-calculator` server) t
 The agent can run in two modes:
 1. **CLI Mode**: Run the agent from the command line with a prompt.
 2. **A2A Server Mode**: Expose the agent as an HTTP service for agent-to-agent communication.
+- **FastAPI / Starlette Support**: Easily mountable agent server.
+- **MCP Tool Integration**: Connects to any MCP server to provide tools to the agent.
+- **JWT Authentication**: Secure interaction using OIDC-compliant JWT tokens.
+- **Authenticated Tool Discovery**: Supports tool lists via authenticated headers.
 
 Python 3.12+ is required.
+
+## Authentication Architecture
+
+This agent uses a **Caller Token Discovery** pattern to ensure secure and dynamic access to tools.
+
+1.  **Client-Side (Invoker/Client)**:
+    - The client obtains an OIDC JWT (e.g., from `MCP_TOKEN` env var).
+    - It includes this token in the `Authorization: Bearer <token>` header when making requests to the Agent (both for `agent-card` and invocations).
+
+2.  **Agent Server (`AuthMiddleware`)**:
+    - Intercepts every request to `/calculator`.
+    - Validates the token against the configured OIDC provider (Issuer/Audience).
+    - If valid, stores the token in a `ContextVar` (`token_context`).
+    - If invalid/missing, returns `401 Unauthorized`.
+
+3.  **Agent Logic (`McpToolset`)**:
+    - When the Agent needs to list tools (for the Agent Card) or call tools (during execution), it needs to authenticate with the backend MCP Server.
+    - We use `token_context.get()` to retrieve the caller's token.
+    - This token is injected into the MCP Session headers via `McpToolset(header_provider=...)`.
+
+This ensures that the **end-user's identity** is propagated all the way to the backend MCP tools.
+
+## Lazy App Initialization
+
+The agent uses a `LazyA2AApp` wrapper for the Starlette application.
+
+**Why?**
+The Agent relies on the MCP Server to define its tools. However, in many deployments (like Docker Compose or local `make` targets), the Agent Server and MCP Server start simultaneously.
+If the Agent tries to connect to the MCP Server immediately at import time, it might fail if the MCP Server isn't ready.
+
+**How it works:**
+- `LazyA2AApp` defers the creation of the underlying `to_a2a()` app and the `AgentCard` build process until the **first request** arrives.
+- This allows the server process to start up successfully even if dependencies are temporarily unavailable.
+- It also enables **Dynamic Agent Card** generation, where the card can be rebuilt based on the caller's context (e.g., visible tools might depend on the user's permissions).
 
 ## Setup
 

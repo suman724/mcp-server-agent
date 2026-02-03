@@ -3,8 +3,40 @@ import logging
 
 import uvicorn
 from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
+from contextvars import ContextVar
+from .auth import TokenVerifier
+from .context import token_context
+
+class AuthMiddleware:
+    def __init__(self, app):
+        self.app = app
+        self.verifier = TokenVerifier()
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Create a lightweight Request wrapper to access headers easily
+        request = Request(scope)
+
+        # Protect all calculator endpoints including agent card
+        if request.url.path.startswith("/calculator"):
+            try:
+                # verify_request returns the token string if successful
+                token = await self.verifier.verify_request(request)
+                token_context.set(token)
+            except ValueError as e:
+                logger.error(f"Auth failed: {e}")
+                response = JSONResponse({"error": str(e)}, status_code=401)
+                await response(scope, receive, send)
+                return
+        
+        await self.app(scope, receive, send)
 
 from a2a.types import AgentCard
 from mcp.client.session import ClientSession
@@ -122,7 +154,7 @@ async def _mcp_health_check(_request):
 def create_app() -> Starlette:
     agent_url = _agent_base_url(A2A_BASE_URL)
     lazy_app = LazyA2AApp(build_adk_agent(), agent_url)
-    return Starlette(
+    app = Starlette(
         routes=[
             Mount(AGENT_PATH, app=lazy_app, name="a2a_agent"),
             Route("/.well-known/agent-card.json", _agent_card_alias(lazy_app)),
@@ -131,6 +163,8 @@ def create_app() -> Starlette:
             Route("/health/mcp", _mcp_health_check),
         ],
     )
+    app.add_middleware(AuthMiddleware)
+    return app
 
 
 app = create_app()
