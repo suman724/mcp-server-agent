@@ -1,4 +1,5 @@
-import asyncio
+import pytest
+from unittest.mock import AsyncMock, patch
 
 from a2a.types import (
     AgentCapabilities,
@@ -8,11 +9,8 @@ from a2a.types import (
     TransportProtocol,
 )
 from google.adk.a2a.utils.agent_card_builder import AgentCardBuilder
-from calculator_agent.agent import CalculatorAgent
-from calculator_agent import agent as agent_module
 
-
-async def _stub_agent_card_build(self):  # noqa: D401
+async def _stub_agent_card_build(*args, **kwargs):  # noqa: D401
     return AgentCard(
         name="Calculator Agent",
         description="Stub agent card for tests.",
@@ -38,32 +36,17 @@ async def _stub_agent_card_build(self):  # noqa: D401
         ],
     )
 
+@pytest.fixture(autouse=True)
+def mock_auth():
+    """Mock TokenVerifier to bypass auth in tests."""
+    with patch("calculator_agent.server.TokenVerifier") as mock_verifier_cls:
+        mock_instance = AsyncMock()
+        mock_instance.verify_request.return_value = "mock_token"
+        mock_verifier_cls.return_value = mock_instance
+        yield mock_verifier_cls
 
-def pytest_configure():
-    AgentCardBuilder.build = _stub_agent_card_build
-    if not hasattr(CalculatorAgent, "run_simple_eval"):
-        async def _run_simple_eval(self, expression: str):
-            try:
-                async with agent_module.streamable_http_client(
-                    self.mcp_url
-                ) as streams:
-                    async with agent_module.ClientSession(
-                        streams[0], streams[1]
-                    ) as session:
-                        await session.initialize()
-                        parts = expression.split()
-                        if len(parts) >= 3:
-                            tool_name = parts[0]
-                            try:
-                                a = float(parts[1])
-                                b = float(parts[2])
-                                return await session.call_tool(
-                                    tool_name, arguments={"a": a, "b": b}
-                                )
-                            except Exception as exc:
-                                return f"Error executing tool: {exc}"
-                        return "Could not parse simple command."
-            except Exception as exc:
-                return f"Error: {exc}"
-
-        CalculatorAgent.run_simple_eval = _run_simple_eval
+@pytest.fixture(autouse=True)
+def mock_agent_card_builder():
+    """Stub AgentCardBuilder to avoid real MCP calls."""
+    with patch.object(AgentCardBuilder, "build", side_effect=_stub_agent_card_build) as mock_build:
+        yield mock_build

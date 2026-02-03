@@ -88,6 +88,9 @@ make run-agent ARGS="Calculate 5 + 3" \
 -   `LLM_API_BASE`: Base URL for LiteLLM providers (example: `http://localhost:11434`).
 -   `LLM_API_KEY`: Optional key for LiteLLM providers that require it.
 -   `LLM_BASE_URL`: Alias for `LLM_API_BASE` (kept for compatibility).
+-   `OIDC_ISSUER`: The OIDC issuer URL for token validation (default: Auth0 dev).
+-   `OIDC_AUDIENCE`: The expected audience in the JWT (default: `https://mcp.msgraph.com`).
+-   `OIDC_JWKS_URL`: URL to fetch the JSON Web Key Set for signature verification.
 
 ### Simple Execution Mode (No LLM)
 
