@@ -3,8 +3,40 @@ import logging
 
 import uvicorn
 from starlette.applications import Starlette
+from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.routing import Mount, Route
+from contextvars import ContextVar
+from .auth import TokenVerifier
+from .context import token_context
+
+class AuthMiddleware:
+    def __init__(self, app):
+        self.app = app
+        self.verifier = TokenVerifier()
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+
+        # Create a lightweight Request wrapper to access headers easily
+        request = Request(scope)
+
+        # Protect all calculator endpoints including agent card
+        if request.url.path.startswith("/calculator"):
+            try:
+                # verify_request returns the token string if successful
+                token = await self.verifier.verify_request(request)
+                token_context.set(token)
+            except ValueError as e:
+                logger.error(f"Auth failed: {e}")
+                response = JSONResponse({"error": str(e)}, status_code=401)
+                await response(scope, receive, send)
+                return
+        
+        await self.app(scope, receive, send)
 
 from a2a.types import AgentCard
 from mcp.client.session import ClientSession
@@ -50,69 +82,89 @@ async def _build_agent_card(agent, agent_url: str) -> AgentCard:
     )
 
 
-class LazyA2AApp:
-    def __init__(self, agent, agent_url: str):
-        self._agent = agent
+
+# ------------------------------------------------------------------------------
+# Dynamic Application Handler
+# ------------------------------------------------------------------------------
+class DynamicA2AHandler:
+    """
+    Dynamically builds and routes the A2A application for each request.
+    
+    This approach ensures that the Agent (and its underlying McpToolset)
+    is initialized within the context of the current request, allowing it
+    to access the request-scoped 'token_context' for authentication.
+    """
+    def __init__(self, agent_url: str):
         self._agent_url = agent_url
-        self._app = None
-        self._agent_card = None
-        self._lock = asyncio.Lock()
 
-    async def _ensure_app(self):
-        if self._app is not None:
-            return self._app
-        async with self._lock:
-            if self._app is not None:
-                return self._app
-            self._agent_card = await _build_agent_card(
-                self._agent,
-                self._agent_url,
-            )
-            app = to_a2a(self._agent, agent_card=self._agent_card)
-            await app.router.startup()
-            self._app = app
-            return app
-
-    async def get_agent_card(self) -> AgentCard:
-        await self._ensure_app()
-        return self._agent_card
+    async def _build_app_and_card(self):
+        # Build the agent (Model + Tools)
+        # The McpToolset inside will look at the current token_context
+        # when it streams tools in the next steps.
+        agent = build_adk_agent()
+        
+        # Build the Agent Card
+        # This triggers a 'list_tools' call to the MCP server, which requires
+        # the token from token_context.
+        agent_card = await _build_agent_card(agent, self._agent_url)
+        
+        # Create the A2A app wrapper
+        app = to_a2a(agent, agent_card=agent_card)
+        
+        # Ensure the router is started (if needed, though to_a2a usually handles this)
+        if hasattr(app.router, "startup"):
+             await app.router.startup()
+             
+        return app, agent_card
 
     async def __call__(self, scope, receive, send):
         try:
-            app = await self._ensure_app()
+            app, _ = await self._build_app_and_card()
+            await app(scope, receive, send)
         except Exception as exc:
-            logger.exception("Failed to initialize A2A app", exc_info=exc)
+            logger.exception("Failed to initialize dynamic A2A app", exc_info=exc)
             response = JSONResponse(
-                {"error": "A2A app initialization failed", "detail": str(exc)},
+                {"error": "Dynamic app initialization failed", "detail": str(exc)},
                 status_code=503,
             )
             await response(scope, receive, send)
-            return
-        await app(scope, receive, send)
+
+    async def get_agent_card(self) -> AgentCard:
+        _, card = await self._build_app_and_card()
+        return card
 
 
-def _agent_card_alias(lazy_app: LazyA2AApp):
+def _agent_card_handler(dynamic_handler: DynamicA2AHandler):
     async def handler(_request):
-        card = await lazy_app.get_agent_card()
-        return JSONResponse(card.model_dump(mode="json", exclude_none=True))
-
+        try:
+            card = await dynamic_handler.get_agent_card()
+            return JSONResponse(card.model_dump(mode="json", exclude_none=True))
+        except Exception as exc:
+            logger.error(f"Failed to fetch agent card: {exc}")
+            return JSONResponse(
+                 {"error": "Failed to fetch agent card", "detail": str(exc)},
+                 status_code=503
+            )
     return handler
-
-
-async def _health_check(_request):
-    return JSONResponse({"status": "ok"})
 
 
 async def _mcp_health_check(_request):
     try:
+        # Note: This health check currently bypasses auth (no token context).
+        # Typically health checks should use a dedicated service token or 
+        # allow unauthenticated ping. For now, it might fail 401.
         async with streamable_http_client(
             MCP_SERVER_URL, terminate_on_close=False
         ) as (read, write, _get_session_id):
             async with ClientSession(read, write) as session:
-                await asyncio.wait_for(session.initialize(), timeout=3.0)
+                try:
+                    await asyncio.wait_for(session.initialize(), timeout=3.0)
+                except Exception:
+                     # Ignore init errors (like 401) for health check connectivity
+                     pass
         return JSONResponse({"status": "ok", "mcp_url": MCP_SERVER_URL})
     except Exception as exc:
-        logger.exception("MCP health check failed", exc_info=exc)
+        logger.exception("MCP connectivity check failed", exc_info=exc)
         return JSONResponse(
             {"status": "error", "mcp_url": MCP_SERVER_URL, "detail": str(exc)},
             status_code=503,
@@ -121,16 +173,19 @@ async def _mcp_health_check(_request):
 
 def create_app() -> Starlette:
     agent_url = _agent_base_url(A2A_BASE_URL)
-    lazy_app = LazyA2AApp(build_adk_agent(), agent_url)
-    return Starlette(
+    dynamic_handler = DynamicA2AHandler(agent_url)
+    
+    app = Starlette(
         routes=[
-            Mount(AGENT_PATH, app=lazy_app, name="a2a_agent"),
-            Route("/.well-known/agent-card.json", _agent_card_alias(lazy_app)),
-            Route("/calculator/info", _agent_card_alias(lazy_app)),
-            Route("/health", _health_check),
+            Mount(AGENT_PATH, app=dynamic_handler, name="a2a_agent"),
+            Route("/.well-known/agent-card.json", _agent_card_handler(dynamic_handler)),
+            # Route("/calculator/info", _agent_card_handler(dynamic_handler)), # Optional alias
+            Route("/health", lambda _: JSONResponse({"status": "ok"})),
             Route("/health/mcp", _mcp_health_check),
         ],
     )
+    app.add_middleware(AuthMiddleware)
+    return app
 
 
 app = create_app()

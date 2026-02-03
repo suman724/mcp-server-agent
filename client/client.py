@@ -10,8 +10,14 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+import os
+
 async def main():
-    client = MCPClient(base_url="http://localhost:8000/mcp/")
+    token = os.getenv("MCP_TOKEN")
+    if not token:
+        logger.warning("MCP_TOKEN environment variable is not set. Requests may fail.")
+
+    client = MCPClient(base_url="http://localhost:8000/mcp/", token=token)
     
     logger.info("Connecting to MCP Calculator Server at http://localhost:8000...")
     

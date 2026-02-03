@@ -85,6 +85,25 @@ python -m mcp_calculator
 Default MCP endpoint:
 `http://localhost:8000/mcp/`
 
+## Authentication
+
+The MCP Server requires a valid JWT token for all requests. The token must be valid for the configured OIDC provider.
+
+### Environment Variables
+
+- `OIDC_ISSUER`: The OIDC issuer URL.
+- `OIDC_AUDIENCE`: The expected audience claim in the token.
+- `OIDC_JWKS_URL`: The URL to fetch the JSON Web Key Set (JWKS) for signature verification.
+
+### Client Usage
+
+To run the client, you must provide a valid JWT token via the `MCP_TOKEN` environment variable:
+
+```bash
+export MCP_TOKEN="your_jwt_token"
+python client.py
+```
+
 ## Agent
 
 The agent lives in `calculator_agent/` and is run from the repo root.

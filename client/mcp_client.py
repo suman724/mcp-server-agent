@@ -11,8 +11,9 @@ class MCPClientError(Exception):
     pass
 
 class MCPClient:
-    def __init__(self, base_url: str = "http://localhost:8000"):
+    def __init__(self, base_url: str = "http://localhost:8000", token: str = None):
         self.base_url = base_url.rstrip("/")
+        self.token = token
 
     async def call_tool(self, tool_name: str, arguments: dict = None) -> Any:
         """
@@ -30,6 +31,9 @@ class MCPClient:
 
         async with httpx.AsyncClient() as client:
             headers = {"Accept": "application/json, text/event-stream"}
+            if self.token:
+                headers["Authorization"] = f"Bearer {self.token}"
+
             logger.debug(f"Sending request to {self.base_url}/: {payload}")
             try:
                 response = await client.post(
@@ -39,12 +43,14 @@ class MCPClient:
                     timeout=30.0
                 )
                 response.raise_for_status()
-            except httpx.HTTPError as e:
+            except httpx.HTTPStatusError as e:
                 logger.error(f"HTTP Error: {e}")
-                raise MCPClientError(f"HTTP Error communicating with server: {e}")
-            
-            response.raise_for_status()
-            
+                logger.error(f"Response content: {e.response.text}")
+                raise MCPClientError(f"HTTP Error: {e.response.text}") from e
+            except httpx.HTTPError as e:
+                logger.error(f"HTTP Connection Error: {e}")
+                raise MCPClientError(f"HTTP Connection Error: {e}")
+
             data = response.json()
             
             if "error" in data:
