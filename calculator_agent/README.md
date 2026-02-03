@@ -35,18 +35,18 @@ This agent uses a **Caller Token Discovery** pattern to ensure secure and dynami
 
 This ensures that the **end-user's identity** is propagated all the way to the backend MCP tools.
 
-## Lazy App Initialization
+## Dynamic Initialization
 
-The agent uses a `LazyA2AApp` wrapper for the Starlette application.
+The agent uses a `DynamicA2AHandler` to manage the lifecycle of the agent application.
 
 **Why?**
-The Agent relies on the MCP Server to define its tools. However, in many deployments (like Docker Compose or local `make` targets), the Agent Server and MCP Server start simultaneously.
-If the Agent tries to connect to the MCP Server immediately at import time, it might fail if the MCP Server isn't ready.
+1.  **Authentication Context**: The agent needs the caller's JWT (from the request) to list and use tools from the MCP server.
+2.  **Startup Reliability**: The Agent Server can start successfully even if the MCP Server is temporarily unavailable, as the connection is established only when a request is received.
 
 **How it works:**
-- `LazyA2AApp` defers the creation of the underlying `to_a2a()` app and the `AgentCard` build process until the **first request** arrives.
-- This allows the server process to start up successfully even if dependencies are temporarily unavailable.
-- It also enables **Dynamic Agent Card** generation, where the card can be rebuilt based on the caller's context (e.g., visible tools might depend on the user's permissions).
+- `DynamicA2AHandler` rebuilds the Agent and Agent Card for **every** request.
+- This ensures that the `McpToolset` is initialized with the correct `token_context` for the current user.
+- While this adds a small overhead per request (tool listing), it ensures robust security and multi-user support.
 
 ## Setup
 
